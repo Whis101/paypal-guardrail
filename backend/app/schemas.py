@@ -1,9 +1,9 @@
 """Pydantic request/response shapes: the HTTP contract, validated at the edge."""
 
-from datetime import datetime
-from typing import Self
+from datetime import UTC, datetime
+from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from app.llm import MAX_MANDATE_CHARS
 from app.models import Decision, RuleType, TxStatus
@@ -11,11 +11,19 @@ from app.models import Decision, RuleType, TxStatus
 MAX_LIMIT_CENTS = 10_000_000  # $100k sanity ceiling
 
 
+def _as_utc(value: datetime) -> datetime:
+    # We always store UTC, but SQLite returns naive datetimes; re-attach the zone.
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+UTCDateTime = Annotated[datetime, AfterValidator(_as_utc)]
+
+
 class TransactionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    created_at: datetime
+    created_at: UTCDateTime
     agent_run_id: int | None
     merchant_raw: str
     amount_cents: int
@@ -72,7 +80,7 @@ class RuleOut(BaseModel):
     merchant: str | None
     limit_cents: int | None
     active: bool
-    created_at: datetime
+    created_at: UTCDateTime
 
 
 class SummaryOut(BaseModel):

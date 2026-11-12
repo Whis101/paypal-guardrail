@@ -246,3 +246,12 @@ def test_seed_default_rules_is_idempotent(db_session):
     assert n > 0
     seed_default_rules(db_session)
     assert len(db_session.query(BudgetRule).all()) == n
+
+
+def test_timestamps_are_serialized_as_utc(client, db_session, paypal, agent):
+    # SQLite drops tzinfo; without an explicit offset, browsers would read UTC as local time.
+    agent["classification"] = cls()
+    tx = client.post("/api/agent/run", json={}).json()
+    listed = client.get("/api/transactions").json()[0]
+    for value in (tx["created_at"], listed["created_at"]):
+        assert value.endswith(("Z", "+00:00")), value
